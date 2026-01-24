@@ -74,6 +74,41 @@ AnalyticsManager.Instance.TrackEvent("level_completed", new Dictionary<string, o
 });
 ```
 
+## Custom Data
+
+You can attach custom JSON data to all analytics events sent by the system.
+
+### Setting Custom Data
+
+```csharp
+AnalyticsManager.Instance.SetCustomData(new Dictionary<string, object>
+{
+    { "user_id", 123 },
+    { "tier", "gold" }
+});
+```
+
+- Pass a `Dictionary<string, object>` with your custom properties
+- The dictionary is automatically serialized to JSON
+- Once set, the custom data is included in every subsequent event
+
+### Resetting Custom Data
+
+```csharp
+// Clear custom data
+AnalyticsManager.Instance.ClearCustomData();
+
+// Or pass null/empty dictionary to SetCustomData
+AnalyticsManager.Instance.SetCustomData(null);
+```
+
+### Behavior
+
+- Custom data is stored in the `custom` field of each `TrackingData` object
+- It persists across multiple event calls until explicitly cleared or changed
+- Empty custom data is not included in the request payload
+- The custom JSON must be valid; invalid JSON is rejected with a log error
+
 ## Batching
 
 ### Manual Batching

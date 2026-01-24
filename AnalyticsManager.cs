@@ -20,6 +20,7 @@ public class AnalyticsManager
         public string session_id { get; set; }
         public string platform { get; set; }
         public string app_version { get; set; }
+        public string custom { get; set; }
         public string timestamp { get; set; }
     }
 
@@ -49,6 +50,8 @@ public class AnalyticsManager
     private string _identity;
     private string _sessionId;
     private string _appVersion;
+    private string _customData = "";
+
     private bool _initialized;
     private bool _serverAlive;
     private bool _isServerChecked;
@@ -113,19 +116,24 @@ public class AnalyticsManager
 
     private Tracking CreateTracking(string name, string value)
     {
+        var trackingData = new TrackingData
+        {
+            name = name,
+            value = value,
+            identity = _identity,
+            session_id = _sessionId,
+            platform = _platform,
+            app_version = _appVersion,
+            timestamp = DateTime.UtcNow.ToString("o") // ISO 8601 format
+        };
+
+        if (!string.IsNullOrEmpty(_customData))
+            trackingData.custom = _customData;
+
         return new Tracking
         {
             tenant_id = _tenantId,
-            tracking = new TrackingData
-            {
-                name = name,
-                value = value,
-                identity = _identity,
-                session_id = _sessionId,
-                platform = _platform,
-                app_version = _appVersion,
-                timestamp = DateTime.UtcNow.ToString("o")
-            }
+            tracking = trackingData
         };
     }
 
@@ -214,6 +222,23 @@ public class AnalyticsManager
 
             await SendRequestAsync("/batch", batchToSend);
         });
+    }
+
+    // Custom Data
+    public void SetCustomData(Dictionary<string, object> customData)
+    {
+        if (customData == null || customData.Count == 0)
+        {
+            _customData = "";
+            return;
+        }
+
+        _customData = JsonSerializer.Serialize(customData);
+    }
+
+    public void ClearCustomData()
+    {
+        _customData = "";
     }
 
     // Public API
