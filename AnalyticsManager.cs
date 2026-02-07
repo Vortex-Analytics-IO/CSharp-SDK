@@ -35,6 +35,27 @@ public class AnalyticsManager
         public List<Tracking> tracks { get; set; } = new List<Tracking>();
     }
 
+    // Verbose logging
+    private bool _verbose = false;
+
+    public void SetVerbose(bool verbose)
+    {
+        _verbose = verbose;
+    }
+
+    private void VortexLog(string format, params object[] args)
+    {
+        if (!_verbose) return;
+        try
+        {
+            Console.WriteLine("[Vortex] " + format, args);
+        }
+        catch
+        {
+            Console.WriteLine("[Vortex] " + string.Format(format, args));
+        }
+    }
+
     // Singleton
     private static readonly Lazy<AnalyticsManager> _lazy = new Lazy<AnalyticsManager>(() => new AnalyticsManager());
     public static AnalyticsManager Instance => _lazy.Value;
@@ -82,6 +103,7 @@ public class AnalyticsManager
         _autoBatching = autoBatching;
         _autoFlushIntervalMs = flushIntervalSec * 1000;
 
+        VortexLog("Init called: tenantId={0}, url={1}, platform={2}, appVersion={3}, autoBatching={4}, flushIntervalSec={5}", tenantId, url, platform, appVersion, autoBatching, flushIntervalSec);
         Initialize();
     }
 
@@ -89,6 +111,8 @@ public class AnalyticsManager
     {
         _initialized = true;
         InitSession();
+
+        VortexLog("AnalyticsManager initialized");
 
         // Run server check in background
         Task.Run(CheckServerAvailabilityAsync);
@@ -100,6 +124,7 @@ public class AnalyticsManager
     {
         _identity = GetPersistentIdentity();
         _sessionId = Guid.NewGuid().ToString();
+        VortexLog("Session initialized - Identity: {0}, SessionId: {1}, AppVersion: {2}", _identity, _sessionId, _appVersion);
     }
 
     private string GetPersistentIdentity()
@@ -107,15 +132,21 @@ public class AnalyticsManager
         string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "analytics.id");
         try
         {
-            if (File.Exists(path)) return File.ReadAllText(path);
-            
+            if (File.Exists(path))
+            {
+                var id = File.ReadAllText(path);
+                VortexLog("Loaded persistent identity: {0}", id);
+                return id;
+            }
             string newId = Guid.NewGuid().ToString();
             File.WriteAllText(path, newId);
+            VortexLog("Generated new persistent identity: {0}", newId);
             return newId;
         }
-        catch 
-        { 
-            return Guid.NewGuid().ToString(); 
+        catch (Exception ex)
+        {
+            VortexLog("Failed to get persistent identity: {0}", ex.Message);
+            return Guid.NewGuid().ToString();
         }
     }
 
@@ -147,15 +178,18 @@ public class AnalyticsManager
     {
         if (string.IsNullOrEmpty(_url)) return;
 
+        VortexLog("Checking server availability at {0}/health", _url);
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             var response = await _httpClient.GetAsync($"{_url}/health", cts.Token);
             _serverAlive = response.IsSuccessStatusCode;
+            VortexLog("Server check completed - Alive: {0}", _serverAlive ? "true" : "false");
         }
-        catch
+        catch (Exception ex)
         {
             _serverAlive = false;
+            VortexLog("Server check failed: {0}", ex.Message);
         }
 
         _isServerChecked = true;
@@ -172,12 +206,24 @@ public class AnalyticsManager
         try
         {
             string json = JsonSerializer.Serialize(data);
+            VortexLog("Sending POST to {0}{1} with body: {2}", _url, endpoint, json);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var response = await _httpClient.PostAsync($"{_url}{endpoint}", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                VortexLog("Request failed: {0}{1}", _url, endpoint);
+                VortexLog("Response code: {0}", (int)response.StatusCode);
+                VortexLog("Response body: {0}", await response.Content.ReadAsStringAsync());
+            }
+            else
+            {
+                VortexLog("Request succeeded: {0}{1}", _url, endpoint);
+            }
             return response.IsSuccessStatusCode;
         }
-        catch
+        catch (Exception ex)
         {
+            VortexLog("Request exception: {0}", ex.Message);
             return false;
         }
     }
@@ -207,6 +253,7 @@ public class AnalyticsManager
         }
 
         var batch = new BatchedTracks { tracks = toSend };
+        VortexLog("Flushing internal queue with {0} events", batch.tracks.Count);
         await SendRequestAsync("/batch", batch);
     }
 
@@ -215,7 +262,6 @@ public class AnalyticsManager
         Task.Run(async () => 
         {
             BatchedTracks batchToSend;
-            
             lock (_lock)
             {
                 if (_manualBatchedTracks.tracks.Count == 0) return;
@@ -224,6 +270,7 @@ public class AnalyticsManager
                 _manualBatchedTracks.tracks.Clear();
             }
 
+            VortexLog("Posting manual batch with {0} events", batchToSend.tracks.Count);
             await SendRequestAsync("/batch", batchToSend);
         });
     }
@@ -264,23 +311,41 @@ public class AnalyticsManager
     private void ProcessTrackEvent(string eventName, string value)
     {
         var t = CreateTracking(eventName, value);
+        VortexLog("TrackEvent: {0} value: {1}", eventName, value);
         lock (_lock)
         {
-            if (!_isServerChecked || _autoBatching) _internalQueue.Add(t);
-            else _ = SendRequestAsync("/track", t);
+            if (!_isServerChecked || _autoBatching)
+            {
+                _internalQueue.Add(t);
+                VortexLog("Event queued internally. Queue size: {0}", _internalQueue.Count);
+            }
+            else
+            {
+                _ = SendRequestAsync("/track", t);
+            }
         }
     }
 
     public void BatchedTrackEvent(string eventName, Dictionary<string, object> props)
     {
         if (!_serverAlive) return;
-        lock (_lock) { _manualBatchedTracks.tracks.Add(CreateTracking(eventName, JsonSerializer.Serialize(props))); }
+        var tracking = CreateTracking(eventName, JsonSerializer.Serialize(props));
+        lock (_lock)
+        {
+            _manualBatchedTracks.tracks.Add(tracking);
+            VortexLog("BatchedTrackEvent: {0} (dict) added to manual batch. Batch size: {1}", eventName, _manualBatchedTracks.tracks.Count);
+        }
     }
 
     public void BatchedTrackEvent(string eventName, string props = "")
     {
         if (!_serverAlive) return;
-        lock (_lock) { _manualBatchedTracks.tracks.Add(CreateTracking(eventName, props)); }
+        var tracking = CreateTracking(eventName, props);
+        lock (_lock)
+        {
+            _manualBatchedTracks.tracks.Add(tracking);
+            VortexLog("BatchedTrackEvent: {0} (string) added to manual batch. Batch size: {1}", eventName, _manualBatchedTracks.tracks.Count);
+        }
     }
 
     // Shutdown / Cleanup
@@ -303,6 +368,7 @@ public class AnalyticsManager
 
         if (_manualBatchedTracks.tracks.Count > 0)
         {
+            VortexLog("Attempting final flush before exit with {0} events", _manualBatchedTracks.tracks.Count);
             var task = SendRequestAsync("/batch", _manualBatchedTracks);
             task.Wait(2000);
         }
