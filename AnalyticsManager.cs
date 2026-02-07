@@ -56,6 +56,8 @@ public class AnalyticsManager
     private bool _serverAlive;
     private bool _isServerChecked;
 
+    private bool _flushCompleted;
+
     private readonly List<Tracking> _internalQueue = new List<Tracking>();
     private readonly BatchedTracks _manualBatchedTracks = new BatchedTracks();
     
@@ -63,7 +65,10 @@ public class AnalyticsManager
     private static readonly HttpClient _httpClient = new HttpClient();
     private CancellationTokenSource _cts;
 
-    private AnalyticsManager() { }
+    private AnalyticsManager() 
+    {
+        AppDomain.CurrentDomain.ProcessExit += (_, __) => Shutdown();
+    }
 
     // Setup methods
     public void Init(string tenantId, string url, string platform, string appVersion = "1.0.0", bool autoBatching = false, int flushIntervalSec = 10)
@@ -209,7 +214,6 @@ public class AnalyticsManager
     {
         Task.Run(async () => 
         {
-            if (!_serverAlive) return;
             BatchedTracks batchToSend;
             
             lock (_lock)
@@ -282,11 +286,14 @@ public class AnalyticsManager
     // Shutdown / Cleanup
     public void Shutdown()
     {
+        if (_flushCompleted) return;
+
         _cts?.Cancel();
 
-        // Move queued items to manual batch for final flush
         lock (_lock)
         {
+            _manualBatchedTracks.tracks.Add(CreateTracking("app_exit", ""));
+
             if (_internalQueue.Count > 0)
             {
                 _manualBatchedTracks.tracks.AddRange(_internalQueue);
@@ -294,11 +301,12 @@ public class AnalyticsManager
             }
         }
 
-        if (_manualBatchedTracks.tracks.Count > 0 && _serverAlive)
+        if (_manualBatchedTracks.tracks.Count > 0)
         {
-            // Blocking call to ensure data is sent before process exit
             var task = SendRequestAsync("/batch", _manualBatchedTracks);
-            task.Wait(2000); 
+            task.Wait(2000);
         }
+
+        _flushCompleted = true;
     }
 }
