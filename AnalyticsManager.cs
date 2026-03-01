@@ -178,18 +178,28 @@ public class AnalyticsManager
     {
         if (string.IsNullOrEmpty(_url)) return;
 
-        VortexLog("Checking server availability at {0}/health", _url);
+        VortexLog("Validating tenant at {0}/validate?tenant_id={1}", _url, _tenantId);
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            var response = await _httpClient.GetAsync($"{_url}/health", cts.Token);
-            _serverAlive = response.IsSuccessStatusCode;
-            VortexLog("Server check completed - Alive: {0}", _serverAlive ? "true" : "false");
+            var response = await _httpClient.GetAsync($"{_url}/validate?tenant_id={Uri.EscapeDataString(_tenantId)}", cts.Token);
+
+            if (response.IsSuccessStatusCode)
+            {
+                _serverAlive = true;
+                VortexLog("Tenant validation succeeded - tenant_id is valid");
+            }
+            else
+            {
+                _serverAlive = false;
+                var body = await response.Content.ReadAsStringAsync();
+                VortexLog("Tenant validation failed - HTTP {0}: {1}", (int)response.StatusCode, body.Trim());
+            }
         }
         catch (Exception ex)
         {
             _serverAlive = false;
-            VortexLog("Server check failed: {0}", ex.Message);
+            VortexLog("Tenant validation request failed (server unreachable): {0}", ex.Message);
         }
 
         _isServerChecked = true;
