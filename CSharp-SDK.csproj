@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+
+    <PackageId>Vortex.CSharp.SDK</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Vortex Analytics IO</Authors>
+    <Company>Vortex Analytics IO</Company>
+    <Description>Pure C# analytics SDK for tracking, batching, and flushing events to Vortex Analytics.</Description>
+    <PackageTags>analytics;telemetry;tracking;vortex</PackageTags>
+    <RepositoryUrl>https://github.com/Vortex-Analytics-IO/CSharp-SDK</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/Vortex-Analytics-IO/CSharp-SDK</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="LICENSE" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

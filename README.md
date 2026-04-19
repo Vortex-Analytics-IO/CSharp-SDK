@@ -1,5 +1,19 @@
 # AnalyticsManager Documentation
 
+[![NuGet](https://img.shields.io/nuget/v/Vortex.CSharp.SDK)](https://www.nuget.org/packages/Vortex.CSharp.SDK/1.0.0)
+
+## Installation
+
+Install the package via NuGet:
+
+```
+dotnet add package Vortex.CSharp.SDK
+```
+
+Or search for [`Vortex.CSharp.SDK`](https://www.nuget.org/packages/Vortex.CSharp.SDK/1.0.0) in the NuGet Package Manager.
+
+---
+
 `AnalyticsManager` is a pure C# singleton class responsible for sending analytics events to a remote server. It is designed for use in any .NET environment (WPF, Monogame, Godot, Console, ASP.NET, etc.).
 
 It supports:
