@@ -43,16 +43,16 @@ public class AnalyticsManager
         _verbose = verbose;
     }
 
-    private void VortexLog(string format, params object[] args)
+    private void HintwayLog(string format, params object[] args)
     {
         if (!_verbose) return;
         try
         {
-            Console.WriteLine("[Vortex] " + format, args);
+            Console.WriteLine("[Hintway] " + format, args);
         }
         catch
         {
-            Console.WriteLine("[Vortex] " + string.Format(format, args));
+            Console.WriteLine("[Hintway] " + string.Format(format, args));
         }
     }
 
@@ -62,7 +62,7 @@ public class AnalyticsManager
 
     // Settings
     private string _tenantId;
-    private string _url = "https://in.vortexanalytics.io";
+    private string _url = "https://in.hintway.app/";
     private string _platform;
     private bool _autoBatching = false;
     private int _autoFlushIntervalMs = 10000;
@@ -103,7 +103,7 @@ public class AnalyticsManager
         _autoBatching = autoBatching;
         _autoFlushIntervalMs = flushIntervalSec * 1000;
 
-        VortexLog("Init called: tenantId={0}, url={1}, platform={2}, appVersion={3}, autoBatching={4}, flushIntervalSec={5}", tenantId, url, platform, appVersion, autoBatching, flushIntervalSec);
+        HintwayLog("Init called: tenantId={0}, url={1}, platform={2}, appVersion={3}, autoBatching={4}, flushIntervalSec={5}", tenantId, url, platform, appVersion, autoBatching, flushIntervalSec);
         Initialize();
     }
 
@@ -112,7 +112,7 @@ public class AnalyticsManager
         _initialized = true;
         InitSession();
 
-        VortexLog("AnalyticsManager initialized");
+        HintwayLog("AnalyticsManager initialized");
 
         // Run server check in background
         Task.Run(CheckServerAvailabilityAsync);
@@ -124,7 +124,7 @@ public class AnalyticsManager
     {
         _identity = GetPersistentIdentity();
         _sessionId = Guid.NewGuid().ToString();
-        VortexLog("Session initialized - Identity: {0}, SessionId: {1}, AppVersion: {2}", _identity, _sessionId, _appVersion);
+        HintwayLog("Session initialized - Identity: {0}, SessionId: {1}, AppVersion: {2}", _identity, _sessionId, _appVersion);
     }
 
     private string GetPersistentIdentity()
@@ -135,17 +135,17 @@ public class AnalyticsManager
             if (File.Exists(path))
             {
                 var id = File.ReadAllText(path);
-                VortexLog("Loaded persistent identity: {0}", id);
+                HintwayLog("Loaded persistent identity: {0}", id);
                 return id;
             }
             string newId = Guid.NewGuid().ToString();
             File.WriteAllText(path, newId);
-            VortexLog("Generated new persistent identity: {0}", newId);
+            HintwayLog("Generated new persistent identity: {0}", newId);
             return newId;
         }
         catch (Exception ex)
         {
-            VortexLog("Failed to get persistent identity: {0}", ex.Message);
+            HintwayLog("Failed to get persistent identity: {0}", ex.Message);
             return Guid.NewGuid().ToString();
         }
     }
@@ -178,7 +178,7 @@ public class AnalyticsManager
     {
         if (string.IsNullOrEmpty(_url)) return;
 
-        VortexLog("Validating tenant at {0}/validate?tenant_id={1}", _url, _tenantId);
+        HintwayLog("Validating tenant at {0}/validate?tenant_id={1}", _url, _tenantId);
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
@@ -187,19 +187,19 @@ public class AnalyticsManager
             if (response.IsSuccessStatusCode)
             {
                 _serverAlive = true;
-                VortexLog("Tenant validation succeeded - tenant_id is valid");
+                HintwayLog("Tenant validation succeeded - tenant_id is valid");
             }
             else
             {
                 _serverAlive = false;
                 var body = await response.Content.ReadAsStringAsync();
-                VortexLog("Tenant validation failed - HTTP {0}: {1}", (int)response.StatusCode, body.Trim());
+                HintwayLog("Tenant validation failed - HTTP {0}: {1}", (int)response.StatusCode, body.Trim());
             }
         }
         catch (Exception ex)
         {
             _serverAlive = false;
-            VortexLog("Tenant validation request failed (server unreachable): {0}", ex.Message);
+            HintwayLog("Tenant validation request failed (server unreachable): {0}", ex.Message);
         }
 
         _isServerChecked = true;
@@ -216,24 +216,24 @@ public class AnalyticsManager
         try
         {
             string json = JsonSerializer.Serialize(data);
-            VortexLog("Sending POST to {0}{1} with body: {2}", _url, endpoint, json);
+            HintwayLog("Sending POST to {0}{1} with body: {2}", _url, endpoint, json);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var response = await _httpClient.PostAsync($"{_url}{endpoint}", content);
             if (!response.IsSuccessStatusCode)
             {
-                VortexLog("Request failed: {0}{1}", _url, endpoint);
-                VortexLog("Response code: {0}", (int)response.StatusCode);
-                VortexLog("Response body: {0}", await response.Content.ReadAsStringAsync());
+                HintwayLog("Request failed: {0}{1}", _url, endpoint);
+                HintwayLog("Response code: {0}", (int)response.StatusCode);
+                HintwayLog("Response body: {0}", await response.Content.ReadAsStringAsync());
             }
             else
             {
-                VortexLog("Request succeeded: {0}{1}", _url, endpoint);
+                HintwayLog("Request succeeded: {0}{1}", _url, endpoint);
             }
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
         {
-            VortexLog("Request exception: {0}", ex.Message);
+            HintwayLog("Request exception: {0}", ex.Message);
             return false;
         }
     }
@@ -263,7 +263,7 @@ public class AnalyticsManager
         }
 
         var batch = new BatchedTracks { tracks = toSend };
-        VortexLog("Flushing internal queue with {0} events", batch.tracks.Count);
+        HintwayLog("Flushing internal queue with {0} events", batch.tracks.Count);
         await SendRequestAsync("/batch", batch);
     }
 
@@ -280,7 +280,7 @@ public class AnalyticsManager
                 _manualBatchedTracks.tracks.Clear();
             }
 
-            VortexLog("Posting manual batch with {0} events", batchToSend.tracks.Count);
+            HintwayLog("Posting manual batch with {0} events", batchToSend.tracks.Count);
             await SendRequestAsync("/batch", batchToSend);
         });
     }
@@ -321,13 +321,13 @@ public class AnalyticsManager
     private void ProcessTrackEvent(string eventName, string value)
     {
         var t = CreateTracking(eventName, value);
-        VortexLog("TrackEvent: {0} value: {1}", eventName, value);
+        HintwayLog("TrackEvent: {0} value: {1}", eventName, value);
         lock (_lock)
         {
             if (!_isServerChecked || _autoBatching)
             {
                 _internalQueue.Add(t);
-                VortexLog("Event queued internally. Queue size: {0}", _internalQueue.Count);
+                HintwayLog("Event queued internally. Queue size: {0}", _internalQueue.Count);
             }
             else
             {
@@ -343,7 +343,7 @@ public class AnalyticsManager
         lock (_lock)
         {
             _manualBatchedTracks.tracks.Add(tracking);
-            VortexLog("BatchedTrackEvent: {0} (dict) added to manual batch. Batch size: {1}", eventName, _manualBatchedTracks.tracks.Count);
+            HintwayLog("BatchedTrackEvent: {0} (dict) added to manual batch. Batch size: {1}", eventName, _manualBatchedTracks.tracks.Count);
         }
     }
 
@@ -354,7 +354,7 @@ public class AnalyticsManager
         lock (_lock)
         {
             _manualBatchedTracks.tracks.Add(tracking);
-            VortexLog("BatchedTrackEvent: {0} (string) added to manual batch. Batch size: {1}", eventName, _manualBatchedTracks.tracks.Count);
+            HintwayLog("BatchedTrackEvent: {0} (string) added to manual batch. Batch size: {1}", eventName, _manualBatchedTracks.tracks.Count);
         }
     }
 
@@ -378,7 +378,7 @@ public class AnalyticsManager
 
         if (_manualBatchedTracks.tracks.Count > 0)
         {
-            VortexLog("Attempting final flush before exit with {0} events", _manualBatchedTracks.tracks.Count);
+            HintwayLog("Attempting final flush before exit with {0} events", _manualBatchedTracks.tracks.Count);
             var task = SendRequestAsync("/batch", _manualBatchedTracks);
             task.Wait(2000);
         }

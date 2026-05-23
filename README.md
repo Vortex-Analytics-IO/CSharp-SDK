@@ -1,6 +1,6 @@
-# Vortex Analytics - C# SDK
+# Hintway - C# SDK
 
-For documentation, visit [documentation.vortexanalytics.io](https://documentation.vortexanalytics.io/).
+For documentation, visit [documentation.hintway.app](https://documentation.hintway.app/).
 
 ## License
 
